@@ -3,22 +3,43 @@ import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, parse_qs
 
+newsWebsitesTraces = {
+    "nytimes.com": {
+        "date": "article header time",
+        "byline": ".byline-prefix + a ",
+        "title": "article header h1",
+        "content": [".StoryBodyCompanionColumn"]
+    },
+        "washingtonpost.com": {
+        "date": "article .display-date",
+        "byline": "article span.author-name",
+        "title": "header h1",
+        "content": [".article-body"]
+    }
+}
+
 def main():
     args = sys.argv[1:]
-    url = args[0]
-    o = urlparse(url)
-    query = parse_qs(o.query)
-    url = o._replace(query=None).geturl()
+    url, domain, query = getUrlAttributes(args[0])
     r = requests.get(url, params=query)
     soup = BeautifulSoup(r.text)
 
-    print(soup.article.header.time.string)
-    print(soup.select_one(".byline-prefix").next_sibling.string)
-    print(soup.article.header.h1.string)
-    for articleBody in (soup.select(".StoryBodyCompanionColumn")):
-        if articleBody.em:
-            articleBody.em.clear()
-        print(articleBody.get_text())
+    print(soup.select_one(newsWebsitesTraces[domain]["date"]).string)
+    print(soup.select_one(newsWebsitesTraces[domain]["byline"]).string)
+    print(soup.select_one(newsWebsitesTraces[domain]["title"]).string)
+    for contentSelector in newsWebsitesTraces[domain]["content"]:
+        for articleBody in soup.select(contentSelector):
+            if articleBody.em:
+                articleBody.em.clear()
+            print(articleBody.get_text())
+
+def getDomain(url: str):
+    sUrl = url.split('.')
+    return '.'.join(sUrl[1:])
+
+def getUrlAttributes(url: str):
+    o = urlparse(url)
+    return o._replace(query=None).geturl(), getDomain(o.netloc), parse_qs(o.query)
 
 
 if __name__ == "__main__":
